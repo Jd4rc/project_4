@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if form.instance.pk %}Правка рассылки{% else %}Новая рассылка{% endif %}{% endblock %}
+
+{% block content %}
+    <h1 class="h3 mb-3">
+        {% if form.instance.pk %}Правка рассылки{% else %}Новая рассылка{% endif %}
+    </h1>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% for error in form.non_field_errors %}
+            <div class="alert alert-danger">{{ error }}</div>
+        {% endfor %}
+        {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.name == 'clients' %}
+                    <div class="form-text">Ctrl или Shift — чтобы выбрать несколько.</div>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+        <button class="btn btn-primary" type="submit">Сохранить</button>
+        <a class="btn btn-link" href="{% url 'mailings:mailing_list' %}">Отмена</a>
+    </form>
+{% endblock %}

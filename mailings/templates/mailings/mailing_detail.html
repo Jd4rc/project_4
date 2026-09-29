@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ mailing.message.subject }} — рассылка{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">{{ mailing.message.subject }}</h1>
+        {% include 'mailings/includes/status_badge.html' with mailing=mailing %}
+    </div>
+
+    <dl class="row">
+        <dt class="col-sm-3">Первая отправка</dt>
+        <dd class="col-sm-9">{{ mailing.first_sent_at|date:"d.m.Y H:i" }}</dd>
+
+        <dt class="col-sm-3">Окончание</dt>
+        <dd class="col-sm-9">{{ mailing.finished_at|date:"d.m.Y H:i" }}</dd>
+
+        <dt class="col-sm-3">Сообщение</dt>
+        <dd class="col-sm-9">
+            <a href="{{ mailing.message.get_absolute_url }}">{{ mailing.message.subject }}</a>
+        </dd>
+
+        <dt class="col-sm-3">Получатели</dt>
+        <dd class="col-sm-9">
+            {% for client in mailing.clients.all %}
+                <a href="{{ client.get_absolute_url }}">{{ client.full_name }}</a>{% if not forloop.last %}, {% endif %}
+            {% empty %}
+                —
+            {% endfor %}
+        </dd>
+    </dl>
+
+    {# Кнопка «Отправить» появится в блоке 5 вместе с самой отправкой. #}
+    <a class="btn btn-outline-secondary" href="{% url 'mailings:mailing_update' mailing.pk %}">Редактировать</a>
+    <a class="btn btn-outline-danger" href="{% url 'mailings:mailing_delete' mailing.pk %}">Удалить</a>
+    <a class="btn btn-link" href="{% url 'mailings:mailing_list' %}">К списку</a>
+{% endblock %}
