@@ -130,3 +130,69 @@ class Mailing(models.Model):
         if self.status == self.Status.CREATED:
             self.status = self.Status.STARTED
             self.save(update_fields=['status'])
+
+
+class MailingAttemptQuerySet(models.QuerySet):
+    def letters(self):
+        """Только записи о конкретных письмах, без записей о запусках.
+
+        Статистика (R16, R18) считается по ним: иначе одна отправка пяти
+        получателям даёт шесть попыток вместо пяти.
+        """
+        return self.filter(client__isnull=False)
+
+
+class MailingAttempt(models.Model):
+    """Попытка рассылки (R11) в две ступени — решение по Q2 в SPEC.md.
+
+    Запись о запуске: client пуст, parent пуст, в ответе сервера — сводка.
+    Запись о письме: client заполнен, parent ссылается на запуск.
+    """
+
+    class Status(models.TextChoices):
+        SUCCESS = 'success', 'Успешно'
+        FAILURE = 'failure', 'Не успешно'
+
+    attempted_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='дата и время попытки',
+    )
+    status = models.CharField(max_length=10, choices=Status, verbose_name='статус')
+    server_response = models.TextField(blank=True, verbose_name='ответ почтового сервера')
+    mailing = models.ForeignKey(
+        Mailing,
+        on_delete=models.CASCADE,
+        related_name='attempts',
+        verbose_name='рассылка',
+    )
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='attempts',
+        verbose_name='получатель',
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='letters',
+        verbose_name='попытка запуска',
+    )
+
+    objects = MailingAttemptQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = 'попытка рассылки'
+        verbose_name_plural = 'попытки рассылок'
+        ordering = ['-attempted_at', '-pk']
+
+    def __str__(self):
+        target = self.client.email if self.client else 'запуск'
+        return f'{target}: {self.get_status_display()}'
+
+    @property
+    def is_run(self):
+        return self.client_id is None
