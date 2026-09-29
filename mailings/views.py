@@ -8,8 +8,8 @@ from django.views.generic import (
     UpdateView,
 )
 
-from mailings.forms import ClientForm
-from mailings.models import Client
+from mailings.forms import ClientForm, MessageForm
+from mailings.models import Client, Message
 
 
 class HomeView(TemplateView):
@@ -42,3 +42,29 @@ class ClientUpdateView(UpdateView):
 class ClientDeleteView(DeleteView):
     model = Client
     success_url = reverse_lazy('mailings:client_list')
+
+
+class MessageListView(ListView):
+    """Список сообщений (R4). Шаблон — mailings/message_list.html."""
+
+    model = Message
+    paginate_by = 20
+
+
+class MessageDetailView(DetailView):
+    model = Message
+
+
+class MessageCreateView(CreateView):
+    model = Message
+    form_class = MessageForm
+
+
+class MessageUpdateView(UpdateView):
+    model = Message
+    form_class = MessageForm
+
+
+class MessageDeleteView(DeleteView):
+    model = Message
+    success_url = reverse_lazy('mailings:message_list')

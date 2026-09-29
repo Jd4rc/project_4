@@ -28,3 +28,29 @@ class Client(models.Model):
 
     def get_absolute_url(self):
         return reverse('mailings:client_detail', args=[self.pk])
+
+
+class Message(models.Model):
+    """Письмо, которое уходит в рассылке (R3)."""
+
+    subject = models.CharField(max_length=255, verbose_name='тема письма')
+    body = models.TextField(verbose_name='тело письма')
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='messages',
+        verbose_name='владелец',
+    )
+
+    class Meta:
+        verbose_name = 'сообщение'
+        verbose_name_plural = 'сообщения'
+        ordering = ['subject']
+
+    def __str__(self):
+        return self.subject
+
+    def get_absolute_url(self):
+        return reverse('mailings:message_detail', args=[self.pk])

@@ -1,6 +1,6 @@
 from django import forms
 
-from mailings.models import Client
+from mailings.models import Client, Message
 
 
 class StyleFormMixin:
@@ -22,3 +22,10 @@ class ClientForm(StyleFormMixin, forms.ModelForm):
         # owner не редактируется руками: заполнится из request.user (блок 1).
         fields = ('full_name', 'email', 'comment')
         widgets = {'comment': forms.Textarea(attrs={'rows': 3})}
+
+
+class MessageForm(StyleFormMixin, forms.ModelForm):
+    class Meta:
+        model = Message
+        fields = ('subject', 'body')
+        widgets = {'body': forms.Textarea(attrs={'rows': 8})}

@@ -8,6 +8,28 @@
 
 ---
 
+## 2026-09-29 · Блок 3: сообщения (R3, R4) · ветка `feature/messages`
+
+- `mailings/models.py` — `Message`: `subject`, `body`, `owner` (`null=True`),
+  русские `verbose_name`, `ordering` по теме, `__str__`, `get_absolute_url()`.
+  Миграция `mailings.0002_message`.
+- `mailings/views.py` — `MessageListView` (пагинация по 20), `Detail`, `Create`,
+  `Update`, `Delete`; `mailings/forms.py` — `MessageForm` на том же `StyleFormMixin`,
+  тело письма — `Textarea` на 8 строк.
+- `mailings/urls.py` — пять маршрутов `messages/…`; в навигации появилась «Сообщения».
+- Шаблоны `message_list` (тело обрезается `truncatechars`), `message_detail`,
+  `message_form`, `message_confirm_delete`; `MessageAdmin` с поиском по теме и телу.
+- **Проверено:** `manage.py test mailings` — 11 тестов зелёные (5 по получателям,
+  6 по сообщениям): список и карточка показывают данные, создание даёт 302 и запись,
+  пустое тело возвращает 200 с ошибкой формы, правка и удаление работают.
+
+**Знать:** блок оказался близнецом второго — те же пять CBV, тот же миксин формы,
+те же имена шаблонов по соглашению. Разница только в валидации: у получателя её даёт
+`unique=True` на email, у сообщения — обязательность `body` (`TextField` без
+`blank=True`), и в обоих случаях `ModelForm` делает проверку сам. Имя контекстной
+переменной у `DetailView` — `message`, с `messages` из django.contrib.messages не
+конфликтует, но при добавлении флеш-сообщений в шаблонах держать в голове.
+
 ## 2026-09-29 · Q5 закрыт: стек на PostgreSQL · не закоммичено
 
 - `SPEC.md` — решение и следствия: `psycopg[binary]`, параметры из `.env`,
