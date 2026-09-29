@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Удаление рассылки{% endblock %}
+
+{% block content %}
+    <h1 class="h3 mb-3">Удалить рассылку?</h1>
+    <p class="fw-semibold">{{ mailing.message.subject }}</p>
+    <p class="text-secondary">
+        с {{ mailing.first_sent_at|date:"d.m.Y H:i" }}
+        до {{ mailing.finished_at|date:"d.m.Y H:i" }},
+        получателей: {{ mailing.clients.count }}
+    </p>
+
+    <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-danger" type="submit">Удалить</button>
+        <a class="btn btn-link" href="{{ mailing.get_absolute_url }}">Отмена</a>
+    </form>
+{% endblock %}

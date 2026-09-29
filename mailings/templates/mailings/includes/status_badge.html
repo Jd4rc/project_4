@@ -1,0 +1,7 @@
+{% if mailing.status == 'started' %}
+    <span class="badge text-bg-success">{{ mailing.get_status_display }}</span>
+{% elif mailing.status == 'finished' %}
+    <span class="badge text-bg-dark">{{ mailing.get_status_display }}</span>
+{% else %}
+    <span class="badge text-bg-secondary">{{ mailing.get_status_display }}</span>
+{% endif %}

@@ -8,8 +8,9 @@
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'mailings:message_list' %}">Сообщения</a>
             </li>
-            {# Рассылки добавятся в блоке 4, когда появятся их маршруты:
-               ссылка на несуществующий url роняет страницу целиком. #}
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'mailings:mailing_list' %}">Рассылки</a>
+            </li>
         </ul>
     </div>
 </nav>

@@ -8,8 +8,8 @@ from django.views.generic import (
     UpdateView,
 )
 
-from mailings.forms import ClientForm, MessageForm
-from mailings.models import Client, Message
+from mailings.forms import ClientForm, MailingForm, MessageForm
+from mailings.models import Client, Mailing, Message
 
 
 class HomeView(TemplateView):
@@ -68,3 +68,36 @@ class MessageUpdateView(UpdateView):
 class MessageDeleteView(DeleteView):
     model = Message
     success_url = reverse_lazy('mailings:message_list')
+
+
+class MailingListView(ListView):
+    """Список рассылок (R6)."""
+
+    model = Mailing
+    paginate_by = 20
+
+    def get_queryset(self):
+        # Статус хранится в базе, поэтому между запусками фоновой задачи он врёт.
+        # Один UPDATE перед выборкой — и список не показывает «Запущена» там,
+        # где время окончания уже прошло (решение по Q3).
+        Mailing.objects.finish_expired()
+        return super().get_queryset().select_related('message')
+
+
+class MailingDetailView(DetailView):
+    model = Mailing
+
+
+class MailingCreateView(CreateView):
+    model = Mailing
+    form_class = MailingForm
+
+
+class MailingUpdateView(UpdateView):
+    model = Mailing
+    form_class = MailingForm
+
+
+class MailingDeleteView(DeleteView):
+    model = Mailing
+    success_url = reverse_lazy('mailings:mailing_list')
