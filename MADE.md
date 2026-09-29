@@ -8,6 +8,37 @@
 
 ---
 
+## 2026-09-29 · Блок 4: рассылки и статусы (R5-R7) · ветка `feature/mailings`
+
+- `mailings/models.py` — `Mailing`: `first_sent_at`, `finished_at`, `status`
+  (`TextChoices`: Создана / Запущена / Завершена), FK на `Message`, M2M на `Client`,
+  `owner`; миграция `mailings.0003_mailing`.
+- `MailingQuerySet.finish_expired()` — один `UPDATE` по просроченным
+  (`finished_at__lt=timezone.now()`), возвращает количество; `Mailing.mark_started()`
+  переводит «Создана» → «Запущена» и не трогает завершённые.
+- `mailings/management/commands/update_mailing_statuses.py` — фоновая задача из
+  решения по Q3, вешается на планировщик ОС.
+- `mailings/forms.py` — `MailingForm` с полями под `<input type="datetime-local">`
+  и проверкой «окончание позже начала»; `StyleFormMixin` научился ставить `form-select`
+  селектам. `status` в форму не вынесен: его ставит система.
+- `MailingListView.get_queryset()` зовёт `finish_expired()` перед выборкой;
+  шаблоны `mailing_list`, `mailing_detail`, `mailing_form`, `mailing_confirm_delete`
+  и общий `includes/status_badge.html`; в навигации — «Рассылки»;
+  `MailingAdmin` с фильтром по статусу и `filter_horizontal` по получателям.
+- **Проверено:** `manage.py test mailings` — 18 тестов зелёные. Среди них: просроченная
+  рассылка закрывается, свежая нет; команда закрывает и печатает «Завершено рассылок: 1»;
+  заход в список сам закрывает просроченную; окончание раньше начала — ошибка формы.
+  Команда прогнана и вживую.
+
+**Знать:** `<input type="datetime-local">` присылает `2026-09-29T14:30`, а в стандартных
+форматах Django такого нет — без явного `input_formats` форма молча отвечает «введите
+правильную дату». Поэтому поля дат объявлены в форме руками, а не взяты из модели.
+Статус хранится строкой, поэтому список зовёт `finish_expired()` перед выборкой: иначе
+между запусками планировщика страница показывает «Запущена» у рассылки, время которой
+вышло. `call_command` в тестах печатает в общий вывод — `stdout=StringIO()` и заодно
+проверка текста. В `MailingQuerySet` статус берётся как `self.model.Status.FINISHED`:
+класс определён раньше модели, прямая ссылка на `Mailing` там ещё не существует.
+
 ## 2026-09-29 · Блок 3: сообщения (R3, R4) · ветка `feature/messages`
 
 - `mailings/models.py` — `Message`: `subject`, `body`, `owner` (`null=True`),
