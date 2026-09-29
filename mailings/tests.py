@@ -1,13 +1,17 @@
 from datetime import timedelta
 from io import StringIO
+from smtplib import SMTPException
+from unittest.mock import patch
 
+from django.core import mail
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from mailings.models import Client as Recipient
-from mailings.models import Mailing, Message
+from mailings.models import Mailing, MailingAttempt, Message
+from mailings.services import MailingFinished, send_mailing
 
 
 class ClientCrudTests(TestCase):
@@ -206,3 +210,101 @@ class MailingTests(TestCase):
         self.assertEqual(self.client.get(delete_url).status_code, 200)
         self.client.post(delete_url)
         self.assertEqual(Mailing.objects.count(), 0)
+
+
+class SendMailingTests(TestCase):
+    """Проверки блока 5 (R8-R15). Почта в тестах — locmem, письма в mail.outbox."""
+
+    def setUp(self):
+        self.message = Message.objects.create(subject='Акция', body='Текст письма.')
+        self.first = Recipient.objects.create(full_name='Иван', email='ivan@example.com')
+        self.second = Recipient.objects.create(full_name='Пётр', email='petr@example.com')
+        self.now = timezone.now()
+        self.mailing = Mailing.objects.create(
+            message=self.message,
+            first_sent_at=self.now - timedelta(hours=1),
+            finished_at=self.now + timedelta(days=1),
+        )
+        self.mailing.clients.set([self.first, self.second])
+
+    def test_success_writes_run_and_letters(self):
+        result = send_mailing(self.mailing)
+
+        self.assertEqual((result.sent, result.failed), (2, 0))
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(MailingAttempt.objects.count(), 3)  # запуск + два письма
+        self.assertEqual(MailingAttempt.objects.letters().count(), 2)
+
+        result.attempt.refresh_from_db()
+        self.assertEqual(result.attempt.status, MailingAttempt.Status.SUCCESS)
+        self.assertIn('Отправлено: 2, ошибок: 0.', result.attempt.server_response)
+
+        self.mailing.refresh_from_db()
+        self.assertEqual(self.mailing.status, Mailing.Status.STARTED)
+
+    def test_failure_does_not_stop_the_rest(self):
+        with patch(
+            'mailings.services.send_mail',
+            side_effect=[SMTPException('сервер недоступен'), None],
+        ):
+            result = send_mailing(self.mailing)
+
+        self.assertEqual((result.sent, result.failed), (1, 1))
+
+        failed = MailingAttempt.objects.letters().get(status=MailingAttempt.Status.FAILURE)
+        self.assertIn('сервер недоступен', failed.server_response)
+
+        result.attempt.refresh_from_db()
+        self.assertEqual(result.attempt.status, MailingAttempt.Status.FAILURE)
+        self.assertIn('Отправлено: 1, ошибок: 1.', result.attempt.server_response)
+
+    def test_total_failure_keeps_status_created(self):
+        with patch('mailings.services.send_mail', side_effect=SMTPException('нет связи')):
+            result = send_mailing(self.mailing)
+
+        self.assertEqual((result.sent, result.failed), (0, 2))
+        self.mailing.refresh_from_db()
+        self.assertEqual(self.mailing.status, Mailing.Status.CREATED)
+
+    def test_finished_mailing_is_not_sent(self):
+        expired = Mailing.objects.create(
+            message=self.message,
+            first_sent_at=self.now - timedelta(days=2),
+            finished_at=self.now - timedelta(days=1),
+        )
+        expired.clients.add(self.first)
+
+        with self.assertRaises(MailingFinished):
+            send_mailing(expired)
+
+        self.assertEqual(MailingAttempt.objects.count(), 0)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_send_view_posts_and_reports(self):
+        response = self.client.post(
+            reverse('mailings:mailing_send', args=[self.mailing.pk]),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Отправлено писем: 2')
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_command_sends_one_mailing(self):
+        out = StringIO()
+        call_command('send_mailing', self.mailing.pk, stdout=out)
+
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertIn('отправлено: 2, ошибок: 0', out.getvalue())
+
+    def test_command_without_id_skips_future_mailings(self):
+        future = Mailing.objects.create(
+            message=self.message,
+            first_sent_at=self.now + timedelta(days=1),
+            finished_at=self.now + timedelta(days=2),
+        )
+        future.clients.add(self.first)
+
+        call_command('send_mailing', stdout=StringIO())
+
+        self.assertEqual(len(mail.outbox), 2)  # только та, у которой время пришло
+        self.assertFalse(future.attempts.exists())
