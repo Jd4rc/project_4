@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-09-29 · Блок 2: получатели рассылки (R1, R2) · ветка `feature/clients`
+
+- `mailings/models.py` — `Client`: `email` (`unique=True`), `full_name`, `comment`,
+  `owner` (`settings.AUTH_USER_MODEL`, `null=True`), `verbose_name` на русском,
+  `ordering` по ФИО, `__str__` и `get_absolute_url()`. Миграция `mailings.0001_initial`.
+- `mailings/views.py` — `ClientListView` (`paginate_by = 20`), `ClientDetailView`,
+  `ClientCreateView`, `ClientUpdateView`, `ClientDeleteView`; все на CBV.
+- `mailings/forms.py` — `ClientForm` + `StyleFormMixin`: Bootstrap-классы проставляются
+  в `__init__`, а не руками в шаблоне.
+- `mailings/urls.py` — пять маршрутов `clients/…`; `templates/includes/nav.html` —
+  ссылка «Получатели».
+- Шаблоны `client_list.html`, `client_detail.html`, `client_form.html`,
+  `client_confirm_delete.html`; `mailings/admin.py` — `ClientAdmin` с поиском.
+- **Проверено:** `manage.py test mailings` — 5 тестов зелёные: список показывает
+  получателя, создание даёт 302 и запись в базе, дубль email возвращает 200 с ошибкой
+  формы и вторую запись не создаёт, правка и удаление работают.
+
+**Знать:** имена шаблонов у CBV выводятся сами (`client_list.html`,
+`client_detail.html`, `client_form.html`, `client_confirm_delete.html`) — переименуешь
+шаблон, вьюха молча перестанет его находить. В тестах модель импортируется как
+`Recipient`: `self.client` в `TestCase` — это тестовый HTTP-клиент, и одноимённая
+модель путает с первой строки. Валидацию дубля email `ModelForm` делает сам из
+`unique=True` — отдельный `clean_email()` не нужен. `owner` в форму не вынесен
+намеренно: заполнится из `request.user`, когда появится вход.
+
 ## 2026-09-28 · Владелец у трёх моделей: решено заводить сразу · не закоммичено
 
 - `SPEC.md` — решение и разбор примера куратора: `owner` на `settings.AUTH_USER_MODEL`,
