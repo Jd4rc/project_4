@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Сообщения — сервис рассылок{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Сообщения</h1>
+        <a class="btn btn-primary" href="{% url 'mailings:message_create' %}">Добавить сообщение</a>
+    </div>
+
+    {% if message_list %}
+        <div class="list-group">
+            {% for message in message_list %}
+                <a class="list-group-item list-group-item-action" href="{{ message.get_absolute_url }}">
+                    <span class="fw-semibold">{{ message.subject }}</span>
+                    <div class="text-secondary small">{{ message.body|truncatechars:90 }}</div>
+                </a>
+            {% endfor %}
+        </div>
+
+        {% if is_paginated %}
+            <nav class="mt-3">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Назад</a>
+                        </li>
+                    {% endif %}
+                    <li class="page-item disabled">
+                        <span class="page-link">{{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперёд</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <p class="text-secondary">Сообщений пока нет.</p>
+    {% endif %}
+{% endblock %}

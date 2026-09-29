@@ -5,7 +5,10 @@
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'mailings:client_list' %}">Получатели</a>
             </li>
-            {# Сообщения и рассылки добавятся в блоках 3-4, когда появятся их маршруты:
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'mailings:message_list' %}">Сообщения</a>
+            </li>
+            {# Рассылки добавятся в блоке 4, когда появятся их маршруты:
                ссылка на несуществующий url роняет страницу целиком. #}
         </ul>
     </div>
