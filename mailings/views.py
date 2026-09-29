@@ -14,12 +14,30 @@ from django.views.generic import (
 from mailings.forms import ClientForm, MailingForm, MessageForm
 from mailings.models import Client, Mailing, Message
 from mailings.services import MailingFinished, send_mailing
+from mailings.statistics import attempt_totals, home_stats, mailing_report
 
 
 class HomeView(TemplateView):
-    """Главная. Статистика (R17-R19) появится в блоке 6."""
+    """Главная: всего рассылок, активных, уникальных получателей (R17-R19)."""
 
     template_name = 'mailings/home.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['stats'] = home_stats()
+        return context
+
+
+class StatisticsView(TemplateView):
+    """Отчёт по попыткам: успешные, неуспешные, всего (R16)."""
+
+    template_name = 'mailings/statistics.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['totals'] = attempt_totals()
+        context['report'] = mailing_report()
+        return context
 
 
 class ClientListView(ListView):

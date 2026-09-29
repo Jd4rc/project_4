@@ -19,6 +19,7 @@ from mailings.views import (
     MessageDetailView,
     MessageListView,
     MessageUpdateView,
+    StatisticsView,
 )
 
 app_name = MailingsConfig.name
@@ -41,4 +42,5 @@ urlpatterns = [
     path('mailings/<int:pk>/edit/', MailingUpdateView.as_view(), name='mailing_update'),
     path('mailings/<int:pk>/delete/', MailingDeleteView.as_view(), name='mailing_delete'),
     path('mailings/<int:pk>/send/', MailingSendView.as_view(), name='mailing_send'),
+    path('statistics/', StatisticsView.as_view(), name='statistics'),
 ]

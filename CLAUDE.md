@@ -12,17 +12,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `SPEC.md` — текст ТЗ и разбор на требования `R1…R19`. Источник истины: спорный вопрос
   решается по нему, а не по памяти. В конце файла перечислено, **чего в ТЗ нет**
   (ролей, планировщика, блога, кэша, требований к БД) — этого не делаем.
-- `TODO.md` — только оставшееся: блоки 1–7 со ссылками на `R…`, у каждой задачи проверка
-  и имя коммита. Пометки: ⛔ блокирует · ⚠️ потом дорого · ❓ вопрос куратору.
+- `TODO.md` — только оставшееся: блоки 0б, 1 и 7, у каждой задачи проверка и имя коммита. Пометки: ⛔ блокирует · ⚠️ потом дорого · ❓ вопрос куратору.
 - `MADE.md` — журнал сделанного, новые записи сверху, в конце каждой блок **Знать:**.
 
 Закончил кусок — перенеси его из `TODO.md` в `MADE.md` в том же заходе.
 
 ## Состояние
 
-Каркас (блок 0) готов, **требований ТЗ закрыто 0 из 19** — весь предметный код впереди.
-Авторизация отложена по решению владельца: модель `users.User` заведена и мигрирована
-(ловушка с `AUTH_USER_MODEL` пройдена), но входа, регистрации и владельца у объектов нет.
+**Все 19 требований ТЗ закрыты**, 32 теста зелёные. Работают: CRUD получателей, сообщений
+и рассылок, статусы с фоновым закрытием, отправка кнопкой и командой, попытки в две ступени,
+статистика и главная. Не сделано (не по ТЗ): перевод на PostgreSQL (блок 0б), вход и
+регистрация (блок 1, отложено владельцем — `owner` у моделей есть, но пустой) и сдача.
 
 ## Команды
 
@@ -36,7 +36,9 @@ poetry run python manage.py createsuperuser
 poetry run python manage.py runserver
 poetry run python manage.py test                    # все тесты
 poetry run python manage.py test mailings           # тесты приложения
-poetry run python manage.py test mailings.tests.SendMailingTest.test_failure   # один тест
+poetry run python manage.py test mailings.tests.SendMailingTests.test_failure_does_not_stop_the_rest   # один тест
+poetry run python manage.py send_mailing 3          # отправить рассылку №3 (без номера — все, кому пора)
+poetry run python manage.py update_mailing_statuses # закрыть просроченные (вешается на планировщик ОС)
 ```
 
 ⚠️ **Установка пакетов из сессии не работает.** `poetry add ...` падает с «All attempts to
@@ -48,8 +50,10 @@ PowerShell: `cd C:\Users\dosed\PycharmProjects\project_4; poetry add <пакет
 
 - `config/` — проект в корне репозитория: `settings.py`, `urls.py`, wsgi/asgi.
   Маршруты приложений подключаются через `include` с `namespace`.
-- `mailings/` — предметная область целиком: получатели, сообщения, рассылки, попытки.
-  Сейчас здесь только `HomeView(TemplateView)` и `mailings/urls.py` с `app_name`.
+- `mailings/` — предметная область целиком: модели `Client`, `Message`, `Mailing`,
+  `MailingAttempt`; CBV во `views.py`, формы в `forms.py` (общий `StyleFormMixin`).
+  Логика вне вьюх: `services.py` — `send_mailing()`, единственный вход отправки для кнопки
+  и команды; `statistics.py` — агрегаты для главной и отчёта. Команды — в `management/commands/`.
 - `users/` — `User(AbstractUser)`, пока без единого своего поля.
 - `templates/` — общий `base.html` (Bootstrap 5 с CDN) и `includes/nav.html`;
   шаблоны приложений лежат у себя: `mailings/templates/mailings/…`.
@@ -61,12 +65,16 @@ PowerShell: `cd C:\Users\dosed\PycharmProjects\project_4; poetry add <пакет
 
 ## Грабли, которые уже стоили времени
 
-- **Почта в Django 6 — это `MAILERS`**, настройки `EMAIL_*` устарели. `startproject`
-  кладёт `MAILERS` с консольным бэкендом: письма печатаются в терминал. Реальный SMTP —
-  блок 5, ключи добавляются в `.env` тогда же.
-- **`{% url %}` на несуществующий маршрут роняет всю страницу** (`NoReverseMatch`).
-  Поэтому в `nav.html` нет ссылок на получателей, сообщения и рассылки — они добавляются
-  вместе со своими блоками, а не заранее.
+- **Почта в Django 6 — это `MAILERS`**, `EMAIL_*` устарели и **не могут** объявляться рядом:
+  `ImproperlyConfigured`. Поэтому хост из `.env` читается в `_email_host` (нижний регистр
+  Django настройкой не считает). Есть `EMAIL_HOST` — SMTP с `timeout`, нет — письма в терминал.
+  Тестовый раннер сам подменяет `MAILERS` на `locmem`: `mail.outbox` работает без `override_settings`.
+- **`{% url %}` на несуществующий маршрут роняет всю страницу** (`NoReverseMatch`):
+  ссылку в `nav.html` добавляй в том же изменении, что и маршрут, а не заранее.
+- **Статистика считается по письмам** (`MailingAttempt.objects.letters()`), не по всем
+  попыткам, и после `finish_expired()`. Второй JOIN в `mailing_report()` размножит строки.
+- **Допущение по Q4:** «уникальный получатель» = клиент, состоящий хотя бы в одной рассылке;
+  куратор не подтвердил. Меняется в одной строке `home_stats()`.
 - **БД — PostgreSQL** (решение по Q5). ⚠️ В коде пока `sqlite3`: переключение вынесено
   отдельной задачей — блок «0б» в `TODO.md`. Параметры подключения пойдут из `.env`,
   в `settings.py` ни имени базы, ни пароля. Пользователю PostgreSQL нужно право

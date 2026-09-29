@@ -3,8 +3,36 @@
 {% block title %}Главная — сервис рассылок{% endblock %}
 
 {% block content %}
-    <h1 class="h3 mb-3">Сервис управления рассылками</h1>
-    <p class="text-secondary mb-0">
-        Каркас поднят. Здесь будет статистика: всего рассылок, активных, уникальных получателей.
-    </p>
+    <h1 class="h3 mb-4">Сервис управления рассылками</h1>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-secondary">Всего рассылок</div>
+                    <div class="display-5 fw-semibold">{{ stats.total }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-secondary">Активных рассылок</div>
+                    <div class="display-5 fw-semibold">{{ stats.active }}</div>
+                    <div class="text-secondary small">со статусом «Запущена»</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-secondary">Уникальных получателей</div>
+                    <div class="display-5 fw-semibold">{{ stats.recipients }}</div>
+                    <div class="text-secondary small">состоят хотя бы в одной рассылке</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <a class="btn btn-outline-secondary" href="{% url 'mailings:statistics' %}">Подробная статистика по попыткам</a>
 {% endblock %}
