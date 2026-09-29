@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Статистика — сервис рассылок{% endblock %}
+
+{% block content %}
+    <h1 class="h3 mb-3">Статистика рассылок</h1>
+
+    <div class="row g-3 mb-2">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-secondary">Всего попыток</div>
+                    <div class="display-6 fw-semibold">{{ totals.total }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-success">
+                <div class="card-body">
+                    <div class="text-secondary">Успешно</div>
+                    <div class="display-6 fw-semibold text-success">{{ totals.success }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-danger">
+                <div class="card-body">
+                    <div class="text-secondary">Не успешно</div>
+                    <div class="display-6 fw-semibold text-danger">{{ totals.failure }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <p class="text-secondary small mb-4">
+        Одна попытка — одно письмо одному получателю. Записи о самом запуске рассылки в счёт не идут.
+    </p>
+
+    <h2 class="h5 mb-3">По рассылкам</h2>
+    {% if report %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Рассылка</th>
+                        <th>Статус</th>
+                        <th class="text-end">Успешно</th>
+                        <th class="text-end">Не успешно</th>
+                        <th class="text-end">Всего</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mailing in report %}
+                        <tr>
+                            <td><a href="{{ mailing.get_absolute_url }}">{{ mailing.message.subject }}</a></td>
+                            <td>{% include 'mailings/includes/status_badge.html' with mailing=mailing %}</td>
+                            <td class="text-end">{{ mailing.letters_success }}</td>
+                            <td class="text-end">{{ mailing.letters_failure }}</td>
+                            <td class="text-end fw-semibold">{{ mailing.letters_total }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-secondary">Рассылок пока нет.</p>
+    {% endif %}
+{% endblock %}
