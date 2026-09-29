@@ -1,7 +1,12 @@
 <nav class="navbar navbar-expand-lg bg-white border-bottom">
     <div class="container">
         <a class="navbar-brand" href="{% url 'mailings:home' %}">Сервис рассылок</a>
-        {# Получатели, сообщения и рассылки добавятся сюда в блоках 2-4,
-           когда появятся их маршруты: ссылка на несуществующий url роняет страницу. #}
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'mailings:client_list' %}">Получатели</a>
+            </li>
+            {# Сообщения и рассылки добавятся в блоках 3-4, когда появятся их маршруты:
+               ссылка на несуществующий url роняет страницу целиком. #}
+        </ul>
     </div>
 </nav>
