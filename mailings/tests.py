@@ -12,6 +12,7 @@ from django.utils import timezone
 from mailings.models import Client as Recipient
 from mailings.models import Mailing, MailingAttempt, Message
 from mailings.services import MailingFinished, send_mailing
+from mailings.statistics import attempt_totals, home_stats, mailing_report
 
 
 class ClientCrudTests(TestCase):
@@ -308,3 +309,115 @@ class SendMailingTests(TestCase):
 
         self.assertEqual(len(mail.outbox), 2)  # только та, у которой время пришло
         self.assertFalse(future.attempts.exists())
+
+
+class StatisticsTests(TestCase):
+    """Проверки блока 6 (R16-R19)."""
+
+    def setUp(self):
+        self.message = Message.objects.create(subject='Акция', body='Текст.')
+        self.ivan = Recipient.objects.create(full_name='Иван', email='ivan@example.com')
+        self.petr = Recipient.objects.create(full_name='Пётр', email='petr@example.com')
+        # Этот получатель ни в одной рассылке не состоит.
+        self.alone = Recipient.objects.create(full_name='Одинокий', email='alone@example.com')
+        self.now = timezone.now()
+
+    def _mailing(self, clients, status=Mailing.Status.CREATED, ends_in=timedelta(days=1)):
+        mailing = Mailing.objects.create(
+            message=self.message,
+            first_sent_at=self.now - timedelta(days=3),
+            finished_at=self.now + ends_in,
+            status=status,
+        )
+        mailing.clients.set(clients)
+        return mailing
+
+    def _letter(self, mailing, client, status, run=None):
+        return MailingAttempt.objects.create(
+            mailing=mailing, client=client, parent=run, status=status, server_response='ответ'
+        )
+
+    def _run(self, mailing, status=MailingAttempt.Status.SUCCESS):
+        return MailingAttempt.objects.create(mailing=mailing, status=status, server_response='сводка')
+
+    def test_home_counts_mailings_and_unique_recipients(self):
+        self._mailing([self.ivan, self.petr])                                # создана
+        self._mailing([self.ivan], Mailing.Status.STARTED)                   # запущена
+        expired = self._mailing([self.petr], Mailing.Status.STARTED, ends_in=timedelta(days=-1))
+
+        response = self.client.get(reverse('mailings:home'))
+
+        self.assertEqual(response.status_code, 200)
+        # Просроченная «Запущена» перед подсчётом закрывается и в активные не попадает.
+        self.assertEqual(response.context['stats'], {'total': 3, 'active': 1, 'recipients': 2})
+        expired.refresh_from_db()
+        self.assertEqual(expired.status, Mailing.Status.FINISHED)
+
+    def test_recipient_in_many_mailings_counted_once(self):
+        for _ in range(3):
+            self._mailing([self.ivan])
+
+        self.assertEqual(home_stats()['recipients'], 1)
+
+    def test_home_on_empty_database(self):
+        Recipient.objects.all().delete()
+
+        response = self.client.get(reverse('mailings:home'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['stats'], {'total': 0, 'active': 0, 'recipients': 0})
+
+    def test_attempt_totals_ignore_run_records(self):
+        mailing = self._mailing([self.ivan, self.petr])
+        # Два запуска: если бы их считали, итог был бы 7, а не 5.
+        first_run = self._run(mailing, MailingAttempt.Status.SUCCESS)
+        second_run = self._run(mailing, MailingAttempt.Status.FAILURE)
+        self._letter(mailing, self.ivan, MailingAttempt.Status.SUCCESS, first_run)
+        self._letter(mailing, self.petr, MailingAttempt.Status.SUCCESS, first_run)
+        self._letter(mailing, self.ivan, MailingAttempt.Status.FAILURE, second_run)
+
+        self.assertEqual(attempt_totals(), {'total': 3, 'success': 2, 'failure': 1})
+
+    def test_report_is_per_mailing_without_join_fanout(self):
+        busy = self._mailing([self.ivan, self.petr])
+        quiet = self._mailing([self.ivan])
+        run = self._run(busy)
+        self._letter(busy, self.ivan, MailingAttempt.Status.SUCCESS, run)
+        self._letter(busy, self.petr, MailingAttempt.Status.SUCCESS, run)
+        self._letter(busy, self.petr, MailingAttempt.Status.FAILURE, run)
+
+        rows = {row.pk: row for row in mailing_report()}
+
+        self.assertEqual(
+            (rows[busy.pk].letters_success, rows[busy.pk].letters_failure, rows[busy.pk].letters_total),
+            (2, 1, 3),
+        )
+        # Рассылка, которую ни разу не запускали, показывает нули, а не пропадает.
+        self.assertEqual(
+            (rows[quiet.pk].letters_success, rows[quiet.pk].letters_failure, rows[quiet.pk].letters_total),
+            (0, 0, 0),
+        )
+
+    def test_statistics_page_renders(self):
+        mailing = self._mailing([self.ivan])
+        self._letter(mailing, self.ivan, MailingAttempt.Status.SUCCESS, self._run(mailing))
+
+        response = self.client.get(reverse('mailings:statistics'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['totals'], {'total': 1, 'success': 1, 'failure': 0})
+        self.assertContains(response, 'Акция')
+
+    def test_statistics_after_real_sending(self):
+        """Сквозная проверка: настоящая отправка, одно письмо из трёх падает."""
+        mailing = self._mailing([self.ivan, self.petr, self.alone])
+
+        with patch(
+            'mailings.services.send_mail',
+            side_effect=[None, SMTPException('нет связи'), None],
+        ):
+            send_mailing(mailing)
+
+        self.assertEqual(attempt_totals(), {'total': 3, 'success': 2, 'failure': 1})
+        row = mailing_report().get(pk=mailing.pk)
+        self.assertEqual((row.letters_success, row.letters_failure), (2, 1))
