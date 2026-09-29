@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.contrib.messages import constants as messages_constants
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -124,6 +125,11 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
+# У Bootstrap класс называется alert-danger, а Django шлёт тег 'error' —
+# без этой замены сообщение об ошибке выводится без оформления.
+MESSAGE_TAGS = {messages_constants.ERROR: 'danger'}
+
+
 # Модель пользователя своя с самого начала: после первой миграции её уже не сменить.
 # Регистрация и вход отложены — сейчас это просто копия стандартного пользователя.
 AUTH_USER_MODEL = 'users.User'
@@ -133,9 +139,31 @@ AUTH_USER_MODEL = 'users.User'
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
 # В Django 6 почта настраивается через MAILERS, настройки EMAIL_* устарели.
-# Пока консольный бэкенд: письма печатаются в терминал. Реальный SMTP — в блоке 5.
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# Есть EMAIL_HOST в .env — шлём по-настоящему, нет — печатаем письма в терминал.
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@example.com')
+
+# Имя переменной намеренно в нижнем регистре: Django 6 запрещает объявлять
+# устаревшие EMAIL_* рядом с MAILERS, а нижний регистр настройкой не считается.
+_email_host = os.getenv('EMAIL_HOST', '')
+
+if _email_host:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': _email_host,
+                'port': int(os.getenv('EMAIL_PORT', '587')),
+                'username': os.getenv('EMAIL_HOST_USER', ''),
+                'password': os.getenv('EMAIL_HOST_PASSWORD', ''),
+                'use_tls': os.getenv('EMAIL_USE_TLS', 'True') == 'True',
+                # Без таймаута недоступный SMTP подвешивает страницу отправки.
+                'timeout': 10,
+            },
+        },
+    }
+else:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        },
+    }

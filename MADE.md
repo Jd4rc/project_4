@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-09-29 · Блок 5: отправка и попытки (R8-R15) · ветка `feature/sending`
+
+- `mailings/models.py` — `MailingAttempt`: время, статус, ответ сервера, FK на рассылку,
+  `client` (пуст у записи о запуске) и `parent` (ссылка письма на свой запуск);
+  `MailingAttemptQuerySet.letters()` отсекает записи о запусках. Миграция `0004`.
+- `mailings/services.py` — `send_mailing()`: один вход для кнопки и команды. Перед
+  отправкой закрывает просроченную (`MailingFinished`), пишет попытку на запуск, идёт
+  по получателям из M2M, на каждого — `send_mail(..., fail_silently=False)` в `try`,
+  в конце проставляет итог запуска и зовёт `mark_started()`.
+- `MailingSendView` — только POST, сообщения через `django.contrib.messages`;
+  маршрут `mailings/<pk>/send/`, кнопка «Отправить сейчас» в карточке (у завершённой
+  задизейблена), на карточке же таблица попыток по запускам.
+- `mailings/management/commands/send_mailing.py` — с номером шлёт одну рассылку,
+  без номера все незавершённые, у которых время пришло.
+- `config/settings.py` — `MAILERS` собирается из `.env`: есть `EMAIL_HOST` — SMTP
+  с `timeout: 10`, нет — консольный бэкенд; `DEFAULT_FROM_EMAIL`, `MESSAGE_TAGS`.
+  Почтовые ключи добавлены в `.env` и `.env.example`. `MailingAttemptAdmin` — только чтение.
+- **Проверено:** 25 тестов зелёных (успех, одна ошибка из двух писем, полный провал,
+  завершённая рассылка, кнопка, команда с номером и без). Плюс живой прогон:
+  два письма в консоли, статус «Запущена», три попытки — запуск и два письма.
+
+**Знать:** Django 6 запрещает объявлять устаревшие `EMAIL_*` рядом с `MAILERS` —
+`ImproperlyConfigured: Deprecated email settings are not allowed`. Поэтому хост из `.env`
+читается в переменную нижнего регистра `_email_host`: нижний регистр Django настройкой
+не считает. Тестовый раннер сам подменяет `MAILERS` на `locmem`, так что `mail.outbox`
+работает без `override_settings`. Запись о запуске создаётся ДО отправки со статусом
+«Не успешно» и переписывается в конце: упади процесс на середине — в базе останется
+правда, а не оптимизм. У Bootstrap нет класса `alert-error`, а Django шлёт тег `error`,
+поэтому `MESSAGE_TAGS` переименовывает его в `danger`.
+
 ## 2026-09-29 · Блок 4: рассылки и статусы (R5-R7) · ветка `feature/mailings`
 
 - `mailings/models.py` — `Mailing`: `first_sent_at`, `finished_at`, `status`

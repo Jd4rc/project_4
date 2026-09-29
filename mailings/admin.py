@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from mailings.models import Client, Mailing, Message
+from mailings.models import Client, Mailing, MailingAttempt, Message
 
 
 @admin.register(Client)
@@ -20,3 +20,11 @@ class MailingAdmin(admin.ModelAdmin):
     list_display = ('message', 'status', 'first_sent_at', 'finished_at', 'owner')
     list_filter = ('status',)
     filter_horizontal = ('clients',)
+
+
+@admin.register(MailingAttempt)
+class MailingAttemptAdmin(admin.ModelAdmin):
+    list_display = ('attempted_at', 'mailing', 'client', 'status', 'server_response')
+    list_filter = ('status',)
+    # Попытки пишет код, руками их не правят.
+    readonly_fields = ('attempted_at', 'mailing', 'client', 'parent', 'status', 'server_response')
