@@ -30,8 +30,48 @@
         </dd>
     </dl>
 
-    {# Кнопка «Отправить» появится в блоке 5 вместе с самой отправкой. #}
-    <a class="btn btn-outline-secondary" href="{% url 'mailings:mailing_update' mailing.pk %}">Редактировать</a>
-    <a class="btn btn-outline-danger" href="{% url 'mailings:mailing_delete' mailing.pk %}">Удалить</a>
-    <a class="btn btn-link" href="{% url 'mailings:mailing_list' %}">К списку</a>
+    <div class="d-flex gap-2 align-items-center mb-4">
+        {# Отправка — действие, поэтому форма с POST, а не ссылка. #}
+        <form method="post" action="{% url 'mailings:mailing_send' mailing.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-success" type="submit"
+                    {% if mailing.status == 'finished' %}disabled{% endif %}>Отправить сейчас</button>
+        </form>
+        <a class="btn btn-outline-secondary" href="{% url 'mailings:mailing_update' mailing.pk %}">Редактировать</a>
+        <a class="btn btn-outline-danger" href="{% url 'mailings:mailing_delete' mailing.pk %}">Удалить</a>
+        <a class="btn btn-link" href="{% url 'mailings:mailing_list' %}">К списку</a>
+    </div>
+
+    <h2 class="h5 mb-3">Попытки рассылки</h2>
+    {% for run in runs %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between">
+                <span>Запуск {{ run.attempted_at|date:"d.m.Y H:i:s" }}</span>
+                <span class="badge {% if run.status == 'success' %}text-bg-success{% else %}text-bg-danger{% endif %}">
+                    {{ run.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="text-secondary">{{ run.server_response }}</p>
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr><th>Получатель</th><th>Статус</th><th>Ответ сервера</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for letter in run.letters.all %}
+                            <tr>
+                                <td>{{ letter.client.email|default:"—" }}</td>
+                                <td>{{ letter.get_status_display }}</td>
+                                <td class="text-secondary small">{{ letter.server_response }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="3" class="text-secondary">Писем в этом запуске нет.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% empty %}
+        <p class="text-secondary">Рассылка ещё ни разу не запускалась.</p>
+    {% endfor %}
 {% endblock %}

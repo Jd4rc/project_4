@@ -9,6 +9,9 @@
 <body class="bg-body-tertiary">
 {% include 'includes/nav.html' %}
 <main class="container py-4">
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+    {% endfor %}
     {% block content %}{% endblock %}
 </main>
 </body>
