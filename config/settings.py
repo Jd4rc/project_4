@@ -138,8 +138,12 @@ MESSAGE_TAGS = {messages_constants.ERROR: 'danger'}
 
 
 # Модель пользователя своя с самого начала: после первой миграции её уже не сменить.
-# Регистрация и вход отложены — сейчас это просто копия стандартного пользователя.
+# Вход по email, логина нет (решение по Q8).
 AUTH_USER_MODEL = 'users.User'
+
+LOGIN_URL = 'users:login'
+LOGIN_REDIRECT_URL = 'mailings:home'
+LOGOUT_REDIRECT_URL = 'mailings:home'
 
 
 # Email

@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-10-20 · Блок 1: вход и регистрация (R20–R24) · ветка `feature/auth`
+
+- `users/models.py` — вход по email (Q8): `username = None`, `email` уникальный,
+  `USERNAME_FIELD = 'email'`, свой `UserManager`; новое поле `email_confirmed`.
+  Миграция `users/0002_login_by_email`.
+- `users/tokens.py` — токен ссылки подтверждения на базе `PasswordResetTokenGenerator`
+  со своим `key_salt`; `email_confirmed` в хэше делает ссылку одноразовой.
+- `users/views.py`, `users/urls.py`, `users/forms.py` — регистрация (пользователь
+  неактивен до перехода по ссылке), подтверждение, вход и выход на встроенных
+  `LoginView` / `LogoutView`, четыре вьюхи `PasswordReset*` со своими шаблонами и адресами.
+- `users/admin.py` — `UserAdmin` без `username`. Шапка: «Войти / Регистрация» гостю,
+  email и «Выйти» вошедшему. `LOGIN_URL`, `LOGIN_REDIRECT_URL`, `LOGOUT_REDIRECT_URL`.
+- **Проверено:** 47 тестов зелёные (15 новых в `users/tests.py`), `makemigrations --check`
+  чистый, миграция применена к рабочей базе (пользователей в ней не было). Мутационная
+  проверка: убраны `email_confirmed` из хэша токена, `transaction.atomic()`, `is_active = False`
+  при регистрации и `iexact` в проверке email — все четыре поломки краснят тесты.
+
+**Знать:** блокировка (блок 9) и «email не подтверждён» — оба `is_active = False`, поэтому
+подтверждение хранится отдельным `email_confirmed`, а он входит в хэш токена: после
+подтверждения старая ссылка перестаёт совпадать и блокировку не снимет. Регистрация и
+отправка письма — в одном `transaction.atomic()`: упал SMTP — пользователя нет, иначе
+email занят, а подтвердить его нечем. Встроенные шаблоны сброса пароля ссылаются на
+маршруты без namespace (`password_reset_confirm`) и упали бы с `NoReverseMatch` — у нас
+свои шаблоны и `success_url` на `users:...`. Выход в Django 5+ — только POST, поэтому в
+шапке форма с кнопкой. Неактивному пользователю `PasswordResetForm` письмо не шлёт —
+сброс пароля подтверждение не обходит. `unique` у `email` регистр учитывает, поэтому
+в форме регистрации отдельная проверка через `iexact`. `createsuperuser` теперь
+спрашивает email, а не логин.
+
 ## 2026-09-29 · Блок 0б: перевод на PostgreSQL · ветка `feature/postgresql`
 
 - `config/settings.py` — `DATABASES` на `django.db.backends.postgresql`, параметры из `.env`:
